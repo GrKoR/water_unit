@@ -1,0 +1,71 @@
+#===================================================================================
+#   BATHROOM WATER UNIT
+#===================================================================================
+# compile this file with ESPHome
+# This file contains unique settings for a specific water unit
+
+substitutions:
+  devicename: bathroom_water_unit
+  upper_devicename: Bathroom Water Unit
+  comment: $upper_devicename
+
+  api_encryption_key: !secret bathroom_encryption_key
+  
+  eth_ip: !secret bathroom_eth_ip
+  eth_ota_ip: !secret bathroom_eth_ota_ip
+
+  ds18b20_address_inbox: "0x8202131d8949aa28" #good
+  ds18b20_address_hot_water: "0x5e01143349229d28" #dumb
+  ds18b20_address_cold_water: "0x5e01143349229d28" #dumb
+  ds18b20_address_water_heater: "0x5e01143349229d28" #dumb
+
+  #############################################################
+  # PRESSURE SENSORS
+  #############################################################
+  #
+  # Service pressure fast updater measurements:
+  # ch1 = 0.351V, ch2 = 0.358V, ch3 = 0.508V, ch4 = 0.552V
+  # ch1 = 0.350V, ch2 = 0.358V, ch3 = 0.508V, ch4 = 0.551V
+  # ch1 = 0.351V, ch2 = 0.358V, ch3 = 0.508V, ch4 = 0.551V
+
+  ##### PRESSURE 1 (1.2 MPa) #####
+  p1_0: "0.142"
+  p1_1: "0.626"
+  p1_2: "1.129"
+  p1_3: "1.636"
+  p1_4: "2.138"
+  p1_5: "2.617"
+  p1_zero: "0.430"  # measured: 0.430 V by 'Service: Disable pressure publishing'
+  p1_max: "4.430"   # 0.430 + 0.333 * (12 - 0) = 4.430
+
+  ##### PRESSURE 2 (1.2 MPa) #####
+  p2_0: "0.142"
+  p2_1: "0.631"
+  p2_2: "1.139"
+  p2_3: "1.654"
+  p2_4: "2.161"
+  p2_5: "2.645"
+  p2_zero: "0.444"  # measured: 0.444 V by 'Service: Disable pressure publishing'
+  p2_max: "4.444"   # 0.444 + 0.333 * (12 - 0) = 4.444
+
+  ##### PRESSURE 3 (0.5 MPa) #####
+  p3_0: "0.272"
+  p3_1: "0.818"
+  p3_2: "1.305"
+  p3_3: "1.793"
+  p3_4: "2.286"
+  p3_5: "2.764"
+  p3_zero: "0.312"  # measured: 0.312 V by 'Service: Disable pressure publishing'
+  p3_max: "4.312"   # 0.312 + 0.8 * (5 - 0) = 4.312
+
+  ##### PRESSURE 4 (0.5 MPa) #####
+  p4_0: "0.276"
+  p4_1: "0.822"
+  p4_2: "1.307"
+  p4_3: "1.793"
+  p4_4: "2.285"
+  p4_5: "2.765"
+  p4_zero: "0.388"  # measured: 0.388 V by 'Service: Disable pressure publishing'
+  p4_max: "4.388"   # 0.388 + 0.8 * (5 - 0) = 4.388
+
+<<: !include water_unit_common.yaml

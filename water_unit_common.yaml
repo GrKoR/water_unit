@@ -1,0 +1,1034 @@
+preferences:
+  flash_write_interval: 0s
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk_mode: GPIO0_IN
+  phy_addr: 1
+  power_pin: GPIO16
+  manual_ip:
+    gateway: !secret eth_gateway
+    static_ip: $eth_ip
+    subnet: !secret eth_subnet
+  use_address: $eth_ota_ip
+
+debug:
+
+logger:
+  level: DEBUG
+
+ota:
+  - platform: esphome
+    password: !secret ota_pass
+
+web_server:
+  port: 80
+  auth:
+    username: !secret web_server_user
+    password: !secret web_server_password
+  version: 3
+
+api:
+  encryption: 
+    key: ${api_encryption_key}
+  reboot_timeout: 0s
+
+  services:
+    ############ HOME ASSISTANT SERVICES ############
+    ### SET HOT COUNTER INITIAL VALUE
+    - service: set_hot_water_counter_value
+      variables:
+        counter_value: float
+      then:
+        - lambda: |-
+            ESP_LOGI("Hot Water Counter", "Set initial value: %.3f", counter_value);
+            id(hot_counter_value_global) = counter_value;
+            id(hot_counter_value).publish_state(id(hot_counter_value_global));
+    
+    ### SET COLD COUNTER INITIAL VALUE
+    - service: set_cold_water_counter_value
+      variables:
+        counter_value: float
+      then:
+        - lambda: |-
+            ESP_LOGI("Cold Water Counter", "Set initial value: %.3f", counter_value);
+            id(cold_counter_value_global) = counter_value;
+            id(cold_counter_value).publish_state(id(cold_counter_value_global));
+    ###############################################
+
+
+time:
+  - platform: homeassistant  
+    id: id_time
+    timezone: "MSK-3"
+    ############# GIDROLOCK SERVICE CALL #############
+    ### Call it every first monday of a month
+    on_time: 
+      - seconds: 0
+        minutes: 0
+        hours: 3
+        days_of_week: MON
+        days_of_month: 1-7
+        months: '*'
+        then:
+          - script.execute: gidrolock_service_operation_script
+    ##################################################
+
+
+one_wire:
+  - platform: gpio
+    pin: GPIO4
+    id: id_1wire
+
+esphome:
+  name: $devicename
+  friendly_name: ${upper_devicename}
+  comment: $comment
+  on_boot:
+    priority: 600
+    then:
+      ############ RESTORE COUNTER VALUE ############
+      ### Hot Water Counter
+      - lambda: |-
+          if (id(hot_counter_value_global) != id(hot_counter_value_global))
+          {
+            ESP_LOGW("hot water counter", "initial value is NaN! Set it to 0.");
+            id(hot_counter_value_global) = 0.0;
+          }
+          id(hot_counter_value).publish_state(id(hot_counter_value_global));
+      ### Cold Water Counter
+      - lambda: |-
+          if (id(cold_counter_value_global) != id(cold_counter_value_global))
+          {
+            ESP_LOGW("cold water counter", "initial value is NaN! Set it to 0.");
+            id(cold_counter_value_global) = 0.0;
+          }
+          id(cold_counter_value).publish_state(id(cold_counter_value_global));
+      ###############################################
+
+      ############ GIDROLOCKS: LAST SERVICE INIT ############
+      - lambda: |-
+          id(id_last_gidrolocks_service_call).publish_state(id(gidrolock_last_service_call_global));
+      #######################################################
+
+      ############ GIDROLOCKS: INITIAL STATE ############
+      - lambda: |-
+          if (id(leakage_found_global))
+          {
+            if (id(gidrolock_hot_state_global)) id(gidrolock_hot_state_global) = false;
+            if (id(gidrolock_cold_state_global)) id(gidrolock_cold_state_global) = false;
+            id(gidrolocks_close_script).execute();
+          }
+          else
+          {
+            id(gidrolocks_open_script)->execute(false);
+          }
+      ###################################################
+
+text_sensor:
+  ################ DIAGNOSTIC: ETHERNET INFORMATION ################
+  - platform: ethernet_info
+    ip_address:
+      name: "Diagnostic: IP Address"
+    mac_address:
+      name: "Diagnostic: MAC Address"
+  ##################################################################
+
+  ################ DIAGNOSTIC: ESPHOME VERSION ################
+  - platform: version
+    name: "Diagnostic: ESPHome Version"
+  #############################################################
+
+  ################ DIAGNOSTIC: DEVICE INFO & RESET REASON ################
+  - platform: debug
+    reset_reason:
+      name: "Diagnostic: Reset Reason"
+  #######################################################################
+
+switch:
+  ################ SERVICE: TEST LED SWITCHES ###########################
+  - platform: gpio
+    name: "Service: Test LED 1"
+    id: id_test_led1
+    pin:
+      number: GPIO5
+      mode:
+        output: True
+      ignore_strapping_warning: True
+    inverted: true
+    icon: mdi:led-outline
+    web_server_sorting_weight: 42
+
+  - platform: gpio
+    name: "Service: Test LED 2"
+    id: id_test_led2
+    pin: GPIO17
+    inverted: true
+    icon: mdi:led-outline
+    web_server_sorting_weight: 43
+  ##################################################
+
+  ################ SERVICE: GIDROLOCKS ################
+  ### HOT WATER GIDROLOCK
+  - platform: gpio
+    name: "Gidrolock: Hot Water"
+    id: gidrolock_hot
+    pin:
+      number: GPIO12
+      mode:
+        output: True
+      ignore_strapping_warning: True
+    inverted: false
+    icon: mdi:lock-open
+    restore_mode: DISABLED
+    web_server_sorting_weight: 40
+
+  ### COLD WATER GIDROLOCK
+  - platform: gpio
+    name: "Gidrolock: Cold Water"
+    id: gidrolock_cold
+    pin:
+      number: GPIO2
+      mode:
+        output: True
+      ignore_strapping_warning: True
+    inverted: false
+    icon: mdi:lock-open
+    restore_mode: DISABLED
+    web_server_sorting_weight: 41
+  #####################################################
+
+  ################ SERVICE: 1-WIRE SEARCHER ################
+  - platform: template
+    id: enable_1wire_search
+    name: "Service: Enable 1-wire search"
+    optimistic: True
+    disabled_by_default: True
+    entity_category: config
+    restore_mode: ALWAYS_OFF
+    web_server_sorting_weight: 44
+  ##########################################################
+
+  ############# SERVICE: ADC RAW VOLTAGE CHECKER #############
+  # It stops the pressure sensors' measurements polling to the Home Assistant. Data is publishing to the log only.
+  - platform: template
+    id: enable_adc_voltage_checker
+    name: "Service: Enable ADC voltage checker"
+    optimistic: True
+    disabled_by_default: True
+    entity_category: config
+    restore_mode: ALWAYS_OFF
+    web_server_sorting_weight: 45
+    on_turn_on:
+      - lambda: |-
+          id(pressure_ch1).stop_poller();
+          id(pressure_ch2).stop_poller();
+          id(pressure_ch3).stop_poller();
+          id(pressure_ch4).stop_poller();
+          ESP_LOGW("Pressure", "Disable pressure polling");
+          ESP_LOGW("Pressure", "Use data below for pressure sensor calibration");
+    on_turn_off:
+      - lambda: |-
+          id(pressure_ch1).start_poller();
+          id(pressure_ch2).start_poller();
+          id(pressure_ch3).start_poller();
+          id(pressure_ch4).start_poller();
+          ESP_LOGW("Pressure", "Enable pressure polling");
+          ESP_LOGW("Pressure", "Calculated average: ch1 = %.3fV, ch2 = %.3fV, ch3 = %.3fV, ch4 = %.3fV",
+                   id(pressure_ch1_zero_point_global) / id(pressure_samples_count_global),
+                   id(pressure_ch2_zero_point_global) / id(pressure_samples_count_global),
+                   id(pressure_ch3_zero_point_global) / id(pressure_samples_count_global),
+                   id(pressure_ch4_zero_point_global) / id(pressure_samples_count_global));
+          id(pressure_ch1_zero_point_global) = 0.0;
+          id(pressure_ch2_zero_point_global) = 0.0;
+          id(pressure_ch3_zero_point_global) = 0.0;
+          id(pressure_ch4_zero_point_global) = 0.0;
+          id(pressure_samples_count_global) = 0;
+  ############################################################
+
+  ########## SERVICE: DISABLE PRESSURE STATE PUBLISHING #############
+  # Pressure will be published to the log only.
+  - platform: template
+    id: disable_pressure_publishing
+    name: "Service: Disable pressure publishing"
+    optimistic: True
+    disabled_by_default: True
+    entity_category: config
+    restore_mode: ALWAYS_OFF
+    web_server_sorting_weight: 47
+  ###################################################################
+
+  ########## DIAGNOSTIC: PRINT SOME DATA TO THE LOG #############
+    #- platform: template
+    #  id: enable_debug_logging
+    #  name: "Diagnostic: Debug logging"
+    #  optimistic: True
+    #  disabled_by_default: True
+    #  entity_category: diagnostic
+    #  restore_mode: ALWAYS_OFF
+    #  web_server_sorting_weight: 48
+  ###############################################################
+
+  ################ DIAGNOSTIC: RESTART ################
+  - platform: restart
+    id: restart_id
+    name: "Restart"
+    disabled_by_default: True
+    entity_category: diagnostic
+    restore_mode: ALWAYS_OFF
+    web_server_sorting_weight: 49
+  #####################################################
+
+interval:
+  ################ 1-WIRE BUS SEARCHER ####################
+  - interval: 3s
+    then:
+      - if:
+          condition:
+            switch.is_on: enable_1wire_search
+          then:
+            - lambda: |-
+                id(id_1wire).search();
+                //delay(10);
+                std::vector<uint64_t> dev_list = id(id_1wire).get_devices();
+                if (dev_list.empty()) {
+                  ESP_LOGI("1-Wire", "  Found no devices!");
+                } else {
+                  ESP_LOGI("1-Wire", "  Found devices:");
+                  for (auto &address : dev_list) {
+                    ESP_LOGI("1-Wire", "    0x%s (%s)", format_hex(address).c_str(), LOG_STR_ARG(id(id_1wire).get_model_str(address & 0xff)));
+                  }
+                }
+  #########################################################
+
+  ############## ADC AVERAGE RAW VOLTAGE CALCUATOR ##################
+  - interval: 200ms
+    then:
+      - if:
+          condition:
+            switch.is_on: enable_adc_voltage_checker
+          then:
+            - lambda: |-
+                float ch1_v = id(pressure_ch1).sample();
+                float ch2_v = id(pressure_ch2).sample();
+                float ch3_v = id(pressure_ch3).sample();
+                float ch4_v = id(pressure_ch4).sample();
+                ESP_LOGI("Voltage", "ch1 = %.3fV, ch2 = %.3fV, ch3 = %.3fV, ch4 = %.3fV", ch1_v, ch2_v, ch3_v, ch4_v);
+                id(pressure_ch1_zero_point_global) += ch1_v;
+                id(pressure_ch2_zero_point_global) += ch2_v;
+                id(pressure_ch3_zero_point_global) += ch3_v;
+                id(pressure_ch4_zero_point_global) += ch4_v;
+                id(pressure_samples_count_global)++;
+  ###################################################################
+
+  ############## DIAGNOSTIC: PRINT SOME DATA TO THE LOG ##################
+    #- interval: 1s
+    #  then:
+    #    - if:
+    #        condition:
+    #          switch.is_on: enable_debug_logging
+    #        then:
+    #          - lambda: |-
+    #              ESP_LOGI("Debug", "Hot GL [global = %s, switch = %s], Cold GL [global = %s, switch = %s]",
+    #                       ONOFF(id(gidrolock_hot_state_global)), ONOFF(id(gidrolock_hot).state),
+    #                       ONOFF(id(gidrolock_cold_state_global)), ONOFF(id(gidrolock_cold).state));
+    #              ESP_LOGI("Debug", "Leakage state: global = %s, sensors = %s",
+    #                       ONOFF(id(leakage_found_global)), ONOFF(id(leakage_sensors).state));
+  ########################################################################
+
+  ################ PERIODIC LEAKAGE ACTIONS ################
+  ### LEAKAGE MONITORING
+  - interval: 3s
+    then:
+      - lambda: |-
+          if (!id(leakage_ignore_flag_global) && id(leakage_sensors).state)
+          {
+            id(leakage_found_global) = true;
+            id(id_leakage_found_state).publish_state(true);
+            if (id(gidrolock_hot).state || id(gidrolock_cold).state)
+            {
+              id(gidrolocks_close_script).execute();
+            }
+          }
+
+  ### LEAKAGE IGNORE STATE MONITOR
+  - interval: 3s
+    then:
+      - lambda: |-
+          auto time_obj = id(id_time).now();
+          if (time_obj.is_valid())
+          {
+            if ((id(leakage_ignore_timestamp_global) <= time_obj.timestamp) && id(leakage_ignore_flag_global))
+            {
+              id(leakage_ignore_flag_global) = false;
+              id(leakage_ignore_timestamp_global) = 0;
+            }
+
+            if (id(time_sync_attempts_count_global) > 0)
+              id(time_sync_attempts_count_global) = 0;
+          }
+          else
+          {
+            // Device hasn't correct time! Try to resync.
+            id(id_time).update();
+
+            if (id(time_sync_attempts_count_global) <= 5)
+            {
+              id(time_sync_attempts_count_global)++;
+            }
+            else
+            {
+              // can't resync, reset leakage ignore flag
+              if (id(leakage_ignore_flag_global))
+              {
+                id(leakage_ignore_flag_global) = false;
+                ESP_LOGI("interval", "Can't sync time! Leakage ignore flag was resetted.");
+              }
+            }
+          }
+  ##########################################################
+
+
+sensor:
+  ################ DIAGNOSTIC: UPTIME ################
+  - platform: uptime
+    type: timestamp
+    name: "Diagnostic: Uptime"
+  ####################################################
+
+  ################ DIAGNOSTIC: DEBUG INFO ################
+  - platform: debug
+    free:
+      name: "Diagnostic: Heap Free"
+    loop_time:
+      name: "Diagnostic: Loop Time"
+  #######################################################
+
+  ########## SERVICE: LAST GIDROLOCKS SERVICE CALL ##########
+  - platform: template
+    name: "Service: Last gidrolocks service call"
+    device_class: timestamp
+    id: id_last_gidrolocks_service_call
+    update_interval: never
+    web_server_sorting_weight: 5
+  ###########################################################
+
+  ################ TEMPERATURE SENSORS ################
+  # TEMPERATURE IN THE BOX
+  - platform: dallas_temp
+    one_wire_id: id_1wire
+    address: ${ds18b20_address_inbox}
+    update_interval: 5min
+    id: inbox_temperature
+    name: Inbox Temperature
+    device_class: temperature
+    unit_of_measurement: "°C"
+    web_server_sorting_weight: 10
+
+  # HOT WATER TEMPERATURE
+  - platform: dallas_temp
+    one_wire_id: id_1wire
+    address: ${ds18b20_address_hot_water}
+    update_interval: 1h #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    id: hot_water_temperature
+    name: Hot Water Temperature
+    device_class: temperature
+    unit_of_measurement: "°C"
+    web_server_sorting_weight: 11
+
+  # COLD WATER TEMPERATURE
+  - platform: dallas_temp
+    one_wire_id: id_1wire
+    address: ${ds18b20_address_cold_water}
+    update_interval: 1h #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    id: cold_water_temperature
+    name: Cold Water Temperature
+    device_class: temperature
+    unit_of_measurement: "°C"
+    web_server_sorting_weight: 12
+
+  # WATER HEATER TEMPERATURE
+  - platform: dallas_temp
+    one_wire_id: id_1wire
+    address: ${ds18b20_address_water_heater}
+    update_interval: 1h #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    id: water_heater_temperature
+    name: Water Heater Temperature
+    device_class: temperature
+    unit_of_measurement: "°C"
+    web_server_sorting_weight: 13
+  ##################################################
+
+  ################ PRESSURE SENSORS ################
+  # PRESSURE #1
+  - platform: adc
+    pin:
+      number: GPIO33
+      mode:
+        input: True
+        pullup: False
+        pulldown: False
+    name: Pressure Channel 1
+    id: pressure_ch1
+    update_interval: 1s
+    attenuation: 12db
+    accuracy_decimals: 2
+    samples: 10
+    device_class: pressure
+    unit_of_measurement: "bar"
+    filters:
+      - sliding_window_moving_average:
+          window_size: 60
+          send_every: 60
+      - calibrate_linear:
+          method: least_squares
+          datapoints:
+            - ${p1_0} -> 0.00
+            - ${p1_1} -> 1.00
+            - ${p1_2} -> 2.00
+            - ${p1_3} -> 3.00
+            - ${p1_4} -> 4.00
+            - ${p1_5} -> 5.00
+      - lambda: |-
+          if (id(disable_pressure_publishing).state)
+          {
+            ESP_LOGI("Pressure", "ADC of pressure #1 = %.3f V", x);
+            return {};
+          }
+          else
+          {
+            return x;
+          }
+      - calibrate_linear:
+          method: least_squares
+          datapoints:
+            - ${p1_zero} -> 0.0
+            - ${p1_max}  -> 12.0
+      - clamp:
+          min_value: 0
+          ignore_out_of_range: False
+    web_server_sorting_weight: 20
+
+  # PRESSURE #2
+  - platform: adc
+    pin:
+      number: GPIO32
+      mode:
+        input: True
+        pullup: False
+        pulldown: False
+    name: Pressure Channel 2
+    id: pressure_ch2
+    update_interval: 1s
+    attenuation: 12db
+    accuracy_decimals: 2
+    samples: 10
+    device_class: pressure
+    unit_of_measurement: "bar"
+    filters:
+      - sliding_window_moving_average:
+          window_size: 60
+          send_every: 60
+      - calibrate_linear:
+          method: least_squares
+          datapoints:
+            - ${p2_0} -> 0.00
+            - ${p2_1} -> 1.00
+            - ${p2_2} -> 2.00
+            - ${p2_3} -> 3.00
+            - ${p2_4} -> 4.00
+            - ${p2_5} -> 5.00
+      - lambda: |-
+          if (id(disable_pressure_publishing).state)
+          {
+            ESP_LOGI("Pressure", "ADC of pressure #2 = %.3f V", x);
+            return {};
+          }
+          else
+          {
+            return x;
+          }
+      - calibrate_linear:
+          method: least_squares
+          datapoints:
+            - ${p2_zero} -> 0.0
+            - ${p2_max}  -> 12.0
+      - clamp:
+          min_value: 0
+          ignore_out_of_range: False
+    web_server_sorting_weight: 21
+
+  # PRESSURE #3
+  - platform: adc
+    pin:
+      number: GPIO14
+      mode:
+        input: True
+        pullup: False
+        pulldown: False
+    name: Pressure Channel 3
+    id: pressure_ch3
+    update_interval: 1s
+    attenuation: 12db
+    accuracy_decimals: 2
+    samples: 10
+    device_class: pressure
+    unit_of_measurement: "bar"
+    filters:
+      - sliding_window_moving_average:
+          window_size: 60
+          send_every: 60
+      - calibrate_linear:
+          method: least_squares
+          datapoints:
+            - ${p3_0} -> 0.00
+            - ${p3_1} -> 1.00
+            - ${p3_2} -> 2.00
+            - ${p3_3} -> 3.00
+            - ${p3_4} -> 4.00
+            - ${p3_5} -> 5.00
+      - lambda: |-
+          if (id(disable_pressure_publishing).state)
+          {
+            ESP_LOGI("Pressure", "ADC of pressure #3 = %.3f V", x);
+            return {};
+          }
+          else
+          {
+            return x;
+          }
+      - calibrate_linear:
+          method: least_squares
+          datapoints:
+            - ${p3_zero} -> 0.0
+            - ${p3_max}  -> 5.0
+      - clamp:
+          min_value: 0
+          ignore_out_of_range: False
+    web_server_sorting_weight: 22
+
+  # PRESSURE #4
+  - platform: adc
+    pin:
+      number: GPIO15
+      mode:
+        input: True
+        pullup: False
+        pulldown: False
+      ignore_strapping_warning: True
+    name: Pressure Channel 4
+    id: pressure_ch4
+    update_interval: 1s
+    attenuation: 12db
+    accuracy_decimals: 2
+    samples: 10
+    device_class: pressure
+    unit_of_measurement: "bar"
+    filters:
+      - sliding_window_moving_average:
+          window_size: 60
+          send_every: 60
+      - calibrate_linear:
+          method: least_squares
+          datapoints:
+            - ${p4_0} -> 0.00
+            - ${p4_1} -> 1.00
+            - ${p4_2} -> 2.00
+            - ${p4_3} -> 3.00
+            - ${p4_4} -> 4.00
+            - ${p4_5} -> 5.00
+      - lambda: |-
+          if (id(disable_pressure_publishing).state)
+          {
+            ESP_LOGI("Pressure", "ADC of pressure #4 = %.3f V", x);
+            return {};
+          }
+          else
+          {
+            return x;
+          }
+      - calibrate_linear:
+          method: least_squares
+          datapoints:
+            - ${p4_zero} -> 0.0
+            - ${p4_max}  -> 5.0
+      - clamp:
+          min_value: 0
+          ignore_out_of_range: False
+    web_server_sorting_weight: 23
+  ##################################################
+
+  ################ COUNTER VALUE ################
+  ### Hot Water Counter
+  - platform: template
+    name: Hot Water Counter
+    id: hot_counter_value
+    update_interval: never
+    accuracy_decimals: 3
+    device_class: water
+    unit_of_measurement: "m³"
+    state_class: total
+    web_server_sorting_weight: 1
+
+  ### Cold Water Counter
+  - platform: template
+    name: Cold Water Counter
+    id: cold_counter_value
+    update_interval: never
+    accuracy_decimals: 3
+    device_class: water
+    unit_of_measurement: "m³"
+    state_class: total
+    web_server_sorting_weight: 2
+  ###############################################
+
+binary_sensor:
+  ################ COUNTER'S TRIGGERS ################
+  # HOT WATER COUNTER TRIGGER
+  - platform: gpio
+    pin:
+      number: GPIO39
+      inverted: false
+      mode:
+        input: true
+    name: Hot Water Counter Trigger
+    id: hot_counter_trigger
+    entity_category: diagnostic
+    filters:
+      - delayed_on_off: 100ms
+    icon: mdi:water
+    on_press:
+      - lambda: |-
+          ESP_LOGI("on_press", "falling edge");
+          id(hot_counter_value_global) = id(hot_counter_value_global) + 0.003;
+          id(hot_counter_value).publish_state(id(hot_counter_value_global));
+    on_release:
+      - lambda: |-
+          ESP_LOGI("on_release", "rising edge");
+          id(hot_counter_value_global) = id(hot_counter_value_global) + 0.007;
+          id(hot_counter_value).publish_state(id(hot_counter_value_global));
+    web_server_sorting_weight: 60
+  # COLD WATER COUNTER TRIGGER
+  - platform: gpio
+    pin:
+      number: GPIO36
+      inverted: false
+      mode:
+        input: true
+        #pullup: true
+    name: Cold Water Counter Trigger
+    id: cold_counter_trigger
+    entity_category: diagnostic
+    filters:
+      - delayed_on_off: 100ms
+    icon: mdi:water
+    on_press:
+      - lambda: |-
+          ESP_LOGI("on_press", "falling edge");
+          id(cold_counter_value_global) = id(cold_counter_value_global) + 0.003;
+          id(cold_counter_value).publish_state(id(cold_counter_value_global));
+    on_release:
+      - lambda: |-
+          ESP_LOGI("on_release", "rising edge");
+          id(cold_counter_value_global) = id(cold_counter_value_global) + 0.007;
+          id(cold_counter_value).publish_state(id(cold_counter_value_global));
+    web_server_sorting_weight: 61
+  ###############################################
+
+  ################ LEAKAGE SENSORS ################
+  - platform: gpio
+    pin:
+      number: GPIO35
+      inverted: true
+      mode:
+        input: true
+    name: Leakage Sensors
+    id: leakage_sensors
+    entity_category: diagnostic
+    web_server_sorting_weight: 30
+  #################################################
+
+  ########## LEAKAGE STATE ##########
+  - platform: template
+    name: "Leakage: found"
+    id: id_leakage_found_state
+    web_server_sorting_weight: 3
+  ##############################################################
+
+button:
+  ################ LEAKAGE ALARM RESET ################
+  - platform: template
+    name: "Leakage: reset alarm"
+    id: id_leakage_alarm_reset
+    on_press:
+      - globals.set:
+          id: leakage_found_global
+          value: 'false'
+      - binary_sensor.template.publish:
+          id: id_leakage_found_state
+          state: OFF
+    web_server_sorting_weight: 6
+  #####################################################
+
+  ################ IGNORE LEAKAGE FOR 10 MINUTES ################
+  - platform: template
+    name: "Leakage: ignore for 10 minutes"
+    id: id_leakage_ignore_for_period
+    on_press:
+      - lambda: |-
+          auto time_obj = id(id_time).now();
+          if (time_obj.is_valid()) {
+            id(leakage_ignore_timestamp_global) = time_obj.timestamp + 10*60;
+            id(leakage_ignore_flag_global) = true;
+          }
+          else
+          {
+            id(leakage_ignore_timestamp_global) = 0;
+            id(leakage_ignore_flag_global) = false;
+            ESP_LOGW("Leakage", "Time isn't synchronized with Home Assistant. Can't set ignore state!");
+          }
+    web_server_sorting_weight: 7
+  ###############################################################
+
+  ################ OPEN GIDROLOCKS ################
+  - platform: template
+    name: "Gidrolocks: Open"
+    on_press:
+      - script.execute:
+          id: gidrolocks_open_script
+          called_by_user: true
+    web_server_sorting_weight: 8
+  #####################################################
+
+  ################ CLOSE GIDROLOCKS ################
+  - platform: template
+    name: "Gidrolocks: Close"
+    on_press:
+      - globals.set:
+          id: gidrolock_hot_state_global
+          value: 'false'
+      - globals.set:
+          id: gidrolock_cold_state_global
+          value: 'false'
+      - script.execute: gidrolocks_close_script
+    web_server_sorting_weight: 9
+  #####################################################
+
+  ################ GIDROLOCKS: MANUAL SERVICE CALL ################
+  - platform: template
+    name: "Gidrolocks: Manual Service Call"
+    on_press: 
+      then:
+        - script.execute: gidrolock_service_operation_manual
+    web_server_sorting_weight: 4
+  #################################################################
+
+globals:
+  ################ COUNTER'S GLOBAL VALUE ################
+  ### HOT WATER COUNTER GLOBAL
+  - id: hot_counter_value_global
+    type: float
+    restore_value: yes
+    initial_value: "NAN"
+  
+  ### COLD WATER COUNTER GLOBAL
+  - id: cold_counter_value_global
+    type: float
+    restore_value: yes
+    initial_value: "NAN"
+  ###############################################
+
+  ################ LEAKAGE GLOBALS ################
+  ### LEAKAGE FOUND
+  - id: leakage_found_global
+    type: bool
+    restore_value: yes
+    initial_value: "false"
+
+  ### LEAKAGE IGNORE FLAG
+  - id: leakage_ignore_flag_global
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+  ### LEAKAGE IGNORE TIMESTAMP
+  - id: leakage_ignore_timestamp_global
+    type: int
+    restore_value: no
+    initial_value: "0"
+
+  ### TIME SYNC ATTEMPTS COUNT
+  - id: time_sync_attempts_count_global
+    type: int
+    restore_value: no
+    initial_value: "0"
+  #################################################
+
+  ################ GIDROLOCKS GLOBALS ################
+  ### GIDROLOCK HOT STATE
+  - id: gidrolock_hot_state_global
+    type: bool
+    restore_value: True
+    initial_value: "false"
+
+  ### GIDROLOCK COLD STATE
+  - id: gidrolock_cold_state_global
+    type: bool
+    restore_value: True
+    initial_value: "false"
+
+  ### GIDROLOCK HOT TEMPORARY STATE
+  - id: gidrolock_hot_tmp_state
+    type: bool
+    restore_value: False
+    initial_value: "false"
+
+  ### GIDROLOCK COLD TEMPORARY STATE
+  - id: gidrolock_cold_tmp_state
+    type: bool
+    restore_value: False
+    initial_value: "false"
+
+  ### GIDROLOCKS LAST SERVICE CALL
+  - id: gidrolock_last_service_call_global
+    type: float
+    restore_value: True
+    initial_value: "NAN"
+  ####################################################
+
+  ################ PRESSURE GLOBALS ################
+  ### PRESSURE #1 CALIBRATION VALUE
+  - id: pressure_ch1_zero_point_global
+    type: float
+    restore_value: False
+    initial_value: "0"
+
+  ### PRESSURE #2 CALIBRATION VALUE
+  - id: pressure_ch2_zero_point_global
+    type: float
+    restore_value: False
+    initial_value: "0"
+
+  ### PRESSURE #3 CALIBRATION VALUE
+  - id: pressure_ch3_zero_point_global
+    type: float
+    restore_value: False
+    initial_value: "0"
+
+  ### PRESSURE #4 CALIBRATION VALUE
+  - id: pressure_ch4_zero_point_global
+    type: float
+    restore_value: False
+    initial_value: "0"
+
+  ### PRESSURE NUMBER OF SAMPLES
+  - id: pressure_samples_count_global
+    type: int
+    restore_value: False
+    initial_value: "0"
+  ####################################################
+
+
+
+script:
+  ############# GIDROLOCK SERVICE OPERATION #############
+  ### AUTOMATIC
+  - id: gidrolock_service_operation_script
+    mode: single
+    then:
+      - if:
+          condition:
+            lambda: 'return (id(id_time).now().is_valid());'
+          then:
+            - if:
+                condition:
+                  # Ignore service call for January cause it's holidays!
+                  lambda: 'return (id(id_time).now().day_of_month != 1 && id(id_time).now().month != 1);'
+                then:
+                  - script.execute: gidrolock_service_operation_manual
+                else:
+                  - logger.log:
+                      format: "Happy New Year! Service call skipped."
+                      level: INFO
+                      tag: "GIDROLOCK SERVICE"
+          else:
+            - logger.log:
+                format: "Time component is invalid!"
+                level: WARN
+                tag: "GIDROLOCK SERVICE"
+  ### MANUAL
+  - id: gidrolock_service_operation_manual
+    mode: single
+    then:
+      - if:
+          condition:
+            lambda: 'return (id(id_time).now().is_valid());'
+          then:
+            - lambda: |-
+                // save initial states of gidrolocks
+                id(gidrolock_hot_tmp_state) = id(gidrolock_hot).state;
+                id(gidrolock_cold_tmp_state) = id(gidrolock_cold).state;
+            - script.execute: gidrolocks_close_script
+            - delay: 30s
+            - script.execute:
+                id: gidrolocks_open_script
+                called_by_user: false
+            - lambda: |-
+                // restore initial states of gidrolocks
+                id(gidrolock_hot).publish_state(id(gidrolock_hot_tmp_state));
+                id(gidrolock_cold).publish_state(id(gidrolock_cold_tmp_state));
+            - lambda: |-
+                id(gidrolock_last_service_call_global) = id(id_time).now().timestamp;
+                id(id_last_gidrolocks_service_call).publish_state(id(gidrolock_last_service_call_global));
+          else:
+            - logger.log:
+                format: "Time component is invalid!"
+                level: WARN
+                tag: "GIDROLOCK SERVICE"
+  #######################################################
+
+  ############# GIDROLOCK CLOSE SCRIPT #############
+  - id: gidrolocks_close_script
+    mode: single
+    then:
+      - switch.turn_off: gidrolock_hot
+      - switch.turn_off: gidrolock_cold
+  ##################################################
+
+  ############# GIDROLOCK OPEN SCRIPT #############
+  - id: gidrolocks_open_script
+    mode: single
+    parameters:
+      called_by_user: bool
+    then:
+      - if:
+          condition:
+            lambda: 'return called_by_user;'
+          then:
+            - globals.set:
+                id: leakage_found_global
+                value: 'false'
+            - binary_sensor.template.publish:
+                id: id_leakage_found_state
+                state: OFF
+            - globals.set:
+                id: gidrolock_hot_state_global
+                value: 'true'
+            - globals.set:
+                id: gidrolock_cold_state_global
+                value: 'true'
+      - if: 
+          condition:
+            lambda: 'return !id(leakage_found_global);'
+          then:
+            - lambda: |-
+                id(gidrolock_hot_state_global) ? id(gidrolock_hot).turn_on() : id(gidrolock_hot).turn_off();
+                id(gidrolock_cold_state_global) ? id(gidrolock_cold).turn_on() : id(gidrolock_cold).turn_off();
+  #################################################

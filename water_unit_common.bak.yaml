@@ -1,0 +1,519 @@
+preferences:
+  flash_write_interval: 0s #1min
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk_mode: GPIO0_IN
+  phy_addr: 1
+  power_pin: GPIO16
+  manual_ip:
+    gateway: !secret eth_gateway
+    static_ip: $eth_ip
+    subnet: !secret eth_subnet
+  use_address: $eth_ota_ip
+
+debug:
+
+logger:
+  level: DEBUG
+
+api:
+  reboot_timeout: 0s
+  password: !secret api_pass
+
+  services:
+    ############ HOME ASSISTANT SERVICES ############
+    ### SET HOT COUNTER INITIAL VALUE
+    - service: set_hot_water_counter_value
+      variables:
+        counter_value: float
+      then:
+        - lambda: |-
+            ESP_LOGI("Hot Water Counter", "Set initial value: %.3f", counter_value);
+            id(${devicename}_hot_counter_value_global) = counter_value;
+            id(${devicename}_hot_counter_value).publish_state(id(${devicename}_hot_counter_value_global));
+    ### SET COLD COUNTER INITIAL VALUE
+    - service: set_cold_water_counter_value
+      variables:
+        counter_value: float
+      then:
+        - lambda: |-
+            ESP_LOGI("Cold Water Counter", "Set initial value: %.3f", counter_value);
+            id(${devicename}_cold_counter_value_global) = counter_value;
+            id(${devicename}_cold_counter_value).publish_state(id(${devicename}_cold_counter_value_global));
+      ###############################################
+
+ota:
+  - platform: esphome
+    password: !secret ota_pass
+
+web_server:
+  port: 80
+  auth:
+    username: !secret web_server_user
+    password: !secret web_server_password
+
+one_wire:
+  - platform: gpio
+    pin: GPIO4
+    id: id_1wire
+
+esphome:
+  name: $devicename
+  friendly_name: ${upper_devicename}
+  comment: $comment
+  on_boot:
+    priority: 600
+    then:
+      ############ RESTORE COUNTER VALUE ############
+      ### Hot Water Counter
+      - lambda: |-
+          if (id(${devicename}_hot_counter_value_global) != id(${devicename}_hot_counter_value_global))
+          {
+            ESP_LOGW("hot water counter", "initial value is NaN! Set it to 0.");
+            id(${devicename}_hot_counter_value_global) = 0.0;
+          }
+          id(${devicename}_hot_counter_value).publish_state(id(${devicename}_hot_counter_value_global));
+      ### Cold Water Counter
+      - lambda: |-
+          if (id(${devicename}_cold_counter_value_global) != id(${devicename}_cold_counter_value_global))
+          {
+            ESP_LOGW("cold water counter", "initial value is NaN! Set it to 0.");
+            id(${devicename}_cold_counter_value_global) = 0.0;
+          }
+          id(${devicename}_cold_counter_value).publish_state(id(${devicename}_cold_counter_value_global));
+      ###############################################
+      ############ GIDROLOCKS INITIAL STATE ############
+      - lambda: |-
+          if (id(leakage_sensors).state)
+          {
+            id(gidrolock_1).turn_off();
+            id(gidrolock_2).turn_off();
+          }
+          else
+          {
+            id(gidrolock_1).turn_on();
+            id(gidrolock_2).turn_on();
+          }
+      ##################################################
+
+switch:
+  ################ TEST LED SWITCHES ################
+  - platform: gpio
+    name: ${upper_devicename} Pin GPIO5
+    pin: GPIO5
+    inverted: true
+
+  - platform: gpio
+    name: ${upper_devicename} Pin GPIO17
+    pin: GPIO17
+    inverted: true
+  ##################################################
+
+  ################ GIDROLOCKS ################
+  ### GIDROLOCK #1
+  - platform: gpio
+    name: ${upper_devicename} Gidrolock_1 GPIO12
+    id: gidrolock_1
+    pin: GPIO12
+    inverted: false
+
+  ### GIDROLOCK #2
+  - platform: gpio
+    name: ${upper_devicename} Gidrolock_2 GPIO2
+    id: gidrolock_2
+    pin: GPIO2
+    inverted: false
+  ############################################
+
+sensor:
+  ################ TEMPERATURE SENSORS ################
+  # TEMPERATURE #1
+  #- platform: dallas_temp
+  #  one_wire_id: id_1wire
+  #  address: 0x1234567812345628
+  #  update_interval: 3s
+  #  id: temperature
+  #  name: ${upper_devicename} Temperature
+  ##################################################
+
+  ################ PRESSURE SENSORS ################
+  # PRESSURE #1
+  - platform: adc
+    pin: GPIO33
+    name: ${upper_devicename} ADC 33
+    id: ${devicename}_adc_33
+    update_interval: never
+    attenuation: 12db
+    accuracy_decimals: 2
+    #raw: true
+    #accuracy_decimals: 0
+    unit_of_measurement: "Bar"
+    filters:
+      - exponential_moving_average:
+          alpha: 0.1
+          send_every: 15
+      - calibrate_linear:
+          method: least_squares
+          datapoints:
+            - 0.4 -> 0.0
+            - 4.5 -> 5
+
+  # PRESSURE #2
+  - platform: adc
+    pin: GPIO32
+    name: ${upper_devicename} ADC 32
+    id: ${devicename}_adc_32
+    update_interval: never
+    attenuation: 12db
+    accuracy_decimals: 2
+    #raw: true
+    #accuracy_decimals: 0
+    #unit_of_measurement: ""
+    unit_of_measurement: "Bar"
+    filters:
+      - exponential_moving_average:
+          alpha: 0.1
+          send_every: 15
+      - calibrate_linear:
+          method: least_squares
+          datapoints:
+            - 0.4 -> 0.0
+            - 4.5 -> 5
+
+  # PRESSURE #3
+  - platform: adc
+    pin: GPIO14
+    name: ${upper_devicename} ADC 14
+    id: ${devicename}_adc_14
+    update_interval: never
+    attenuation: 12db
+    accuracy_decimals: 2
+    #raw: true
+    #accuracy_decimals: 0
+    unit_of_measurement: "Bar"
+    filters:
+      - exponential_moving_average:
+          alpha: 0.1
+          send_every: 15
+      - calibrate_linear:
+          method: least_squares
+          datapoints:
+            - 0.4 -> 0.0
+            - 4.5 -> 12
+
+  # PRESSURE #4
+  - platform: adc
+    pin: GPIO15
+    name: ${upper_devicename} ADC 15
+    id: ${devicename}_adc_15
+    update_interval: never
+    attenuation: 12db
+    accuracy_decimals: 2
+    #raw: true
+    #accuracy_decimals: 0
+    unit_of_measurement: "Bar"
+    filters:
+      - exponential_moving_average:
+          alpha: 0.1
+          send_every: 15
+      - calibrate_linear:
+          method: least_squares
+          datapoints:
+            - 0.4 -> 0.0
+            - 4.5 -> 12
+  ##################################################
+
+  ################ COUNTER VALUE ################
+  ### Hot Water Counter
+  - platform: template
+    name: ${upper_devicename} Hot Water Counter
+    id: ${devicename}_hot_counter_value
+    update_interval: never
+    accuracy_decimals: 3
+  ### Cold Water Counter
+  - platform: template
+    name: ${upper_devicename} Cold Water Counter
+    id: ${devicename}_cold_counter_value
+    update_interval: never
+    accuracy_decimals: 3
+  ###############################################
+
+#  ################ COUNTER CALIBRATION ################
+#  - platform: template
+#    id: counter_correction_value
+#    name: ${upper_devicename} counter correction value
+#    update_interval: never
+#    accuracy_decimals: 3
+#    disabled_by_default: true
+#  #####################################################
+
+interval:
+  ################ PRESSURE SENSOR UPDATER ################
+  - interval: 100ms
+    then:
+      - lambda: |-
+          switch (static_cast<int>(id(${devicename}_ADC_selector).state))
+          {
+            case 0:
+              id(${devicename}_adc_32).update();
+              break;
+            case 1:
+              id(${devicename}_adc_33).update();
+              break;
+            case 2:
+              id(${devicename}_adc_14).update();
+              break;
+            case 3:
+              id(${devicename}_adc_15).update();
+              break;
+            default:
+              ESP_LOGW("ADC updater", "Unknown ADC index!");
+              break;
+          }
+  #########################################################
+
+  #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#
+  #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#
+  ################ 1-WIRE BUS SEARCH MACHINE ################
+  #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#
+  #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#
+  - interval: 3s
+    then:
+      - lambda: |-
+          id(id_1wire).search();
+          delay(20);
+          std::vector<uint64_t> dev_list = id(id_1wire).get_devices();
+          if (dev_list.empty()) {
+            ESP_LOGI("1-Wire", "  Found no devices!");
+          } else {
+            ESP_LOGI("1-Wire", "  Found devices:");
+            for (auto &address : dev_list) {
+              ESP_LOGI("1-Wire", "    0x%s (%s)", format_hex(address).c_str(), LOG_STR_ARG(id(id_1wire).get_model_str(address & 0xff)));
+            }
+          }
+  #########################################################
+  #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#
+  #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#
+
+number:
+  ################ PRESSURE SENSOR SELECTOR ################
+  - platform: template
+    name: ${upper_devicename} ADC Chanel Selector
+    id: ${devicename}_ADC_selector
+    disabled_by_default: true
+    optimistic: true
+    min_value: 0
+    max_value: 3
+    step: 1
+  ##########################################################
+
+#  ################ COUNTER CALIBRATION ################
+#  - platform: template
+#    name: ${upper_devicename} counter correction x10000
+#    id: counter_correction_10000
+#    disabled_by_default: true
+#    optimistic: true
+#    min_value: 0
+#    max_value: 9
+#    step: 1
+#    on_value:
+#      - script.execute: update_correction_value
+#
+#  - platform: template
+#    name: ${upper_devicename} counter correction x1000
+#    id: counter_correction_1000
+#    disabled_by_default: true
+#    optimistic: true
+#    min_value: 0
+#    max_value: 9
+#    step: 1
+#    on_value:
+#      - script.execute: update_correction_value
+#
+#  - platform: template
+#    name: ${upper_devicename} counter correction x100
+#    id: counter_correction_100
+#    disabled_by_default: true
+#    optimistic: true
+#    min_value: 0
+#    max_value: 9
+#    step: 1
+#    on_value:
+#      - script.execute: update_correction_value
+#
+#  - platform: template
+#    name: ${upper_devicename} counter correction x10
+#    id: counter_correction_10
+#    disabled_by_default: true
+#    optimistic: true
+#    min_value: 0
+#    max_value: 9
+#    step: 1
+#    on_value:
+#      - script.execute: update_correction_value
+#
+#  - platform: template
+#    name: ${upper_devicename} counter correction x1
+#    id: counter_correction_1
+#    disabled_by_default: true
+#    optimistic: true
+#    min_value: 0
+#    max_value: 9
+#    step: 1
+#    on_value:
+#      - script.execute: update_correction_value
+#
+#  - platform: template
+#    name: ${upper_devicename} counter correction x0.1
+#    id: counter_correction_0
+#    disabled_by_default: true
+#    optimistic: true
+#    min_value: 0
+#    max_value: 9
+#    step: 1
+#    on_value:
+#      - script.execute: update_correction_value
+#
+#  - platform: template
+#    name: ${upper_devicename} counter correction x0.01
+#    id: counter_correction_00
+#    disabled_by_default: true
+#    optimistic: true
+#    min_value: 0
+#    max_value: 9
+#    step: 1
+#    on_value:
+#      - script.execute: update_correction_value
+#
+#  - platform: template
+#    name: ${upper_devicename} counter correction x0.001
+#    id: counter_correction_000
+#    disabled_by_default: true
+#    optimistic: true
+#    min_value: 0
+#    max_value: 9
+#    step: 1
+#    on_value:
+#      - script.execute: update_correction_value
+#  #####################################################
+
+binary_sensor:
+  ################ COUNTER'S TRIGGERS ################
+  # HOT WATER COUNTER TRIGGER
+  - platform: gpio
+    pin:
+      number: GPIO39
+      inverted: false
+      mode:
+        input: true
+        #pullup: true
+    name: ${upper_devicename} Hot Water Counter Trigger
+    id: ${devicename}_hot_counter_trigger
+    filters:
+      - delayed_on_off: 100ms
+    icon: mdi:water
+    on_press:
+      - lambda: |-
+          ESP_LOGI("on_press", "falling edge");
+          id(${devicename}_hot_counter_value_global) = id(${devicename}_hot_counter_value_global) + 0.003;
+          id(${devicename}_hot_counter_value).publish_state(id(${devicename}_hot_counter_value_global));
+    on_release:
+      - lambda: |-
+          ESP_LOGI("on_release", "rising edge");
+          id(${devicename}_hot_counter_value_global) = id(${devicename}_hot_counter_value_global) + 0.007;
+          id(${devicename}_hot_counter_value).publish_state(id(${devicename}_hot_counter_value_global));
+  # COLD WATER COUNTER TRIGGER
+  - platform: gpio
+    pin:
+      number: GPIO36
+      inverted: false
+      mode:
+        input: true
+        #pullup: true
+    name: ${upper_devicename} Cold Water Counter Trigger
+    id: ${devicename}_cold_counter_trigger
+    filters:
+      - delayed_on_off: 100ms
+    icon: mdi:water
+    on_press:
+      - lambda: |-
+          ESP_LOGI("on_press", "falling edge");
+          id(${devicename}_cold_counter_value_global) = id(${devicename}_cold_counter_value_global) + 0.003;
+          id(${devicename}_cold_counter_value).publish_state(id(${devicename}_cold_counter_value_global));
+    on_release:
+      - lambda: |-
+          ESP_LOGI("on_release", "rising edge");
+          id(${devicename}_cold_counter_value_global) = id(${devicename}_cold_counter_value_global) + 0.007;
+          id(${devicename}_cold_counter_value).publish_state(id(${devicename}_cold_counter_value_global));
+  ###############################################
+  ################ LEAKAGE SENSORS ################
+  - platform: gpio
+    pin:
+      number: GPIO35
+      inverted: true
+      mode:
+        input: true
+    name: ${upper_devicename} Leakage Sensors
+    id: leakage_sensors
+    on_press:
+      then:
+        - switch.turn_off: gidrolock_1
+        - switch.turn_off: gidrolock_2
+    on_release:
+      then:
+        - switch.turn_on: gidrolock_1
+        - switch.turn_on: gidrolock_2
+  #################################################
+
+globals:
+  ################ COUNTER'S GLOBAL VALUE ################
+  ### HOT WATER COUNTER GLOBAL
+  - id: ${devicename}_hot_counter_value_global
+    type: float
+    restore_value: yes
+    initial_value: "NAN"
+  ### COLD WATER COUNTER GLOBAL
+  - id: ${devicename}_cold_counter_value_global
+    type: float
+    restore_value: yes
+    initial_value: "NAN"
+  ###############################################
+
+#script:
+#  ################ COUNTER CALIBRATION ################
+#  - id: update_correction_value
+#    mode: queued
+#    max_runs: 8
+#    then:
+#      - lambda: |-
+#          float value = id(counter_correction_10000).state*10000 +
+#                        id(counter_correction_1000).state*1000 +
+#                        id(counter_correction_100).state*100 +
+#                        id(counter_correction_10).state*10 +
+#                        id(counter_correction_1).state +
+#                        id(counter_correction_0).state*0.1 +
+#                        id(counter_correction_00).state*0.01 +
+#                        id(counter_correction_000).state*0.001;
+#          id(counter_correction_value).publish_state(value);
+#  #####################################################
+
+#button:
+#  ################ COUNTER CALIBRATION ################
+#  - platform: template
+#    name: ${upper_devicename} Set hot water counter initial value
+#    #internal: true
+#    disabled_by_default: true
+#    on_press:
+#      - lambda: |-
+#          ESP_LOGI("Counter", "Set initial value: %.3f", id(counter_correction_value).state);
+#          id(${devicename}_hot_counter_value_global) = id(counter_correction_value).state;
+#          id(${devicename}_hot_counter_value).publish_state(id(${devicename}_hot_counter_value_global));
+#  #####################################################

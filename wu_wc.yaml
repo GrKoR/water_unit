@@ -1,0 +1,87 @@
+#===================================================================================
+#   WC WATER UNIT
+#===================================================================================
+# compile this file with ESPHome
+# This file contains unique settings for a specific water unit
+
+substitutions:
+  devicename: wc_water_unit
+  upper_devicename: WC Water Unit
+  comment: $upper_devicename
+
+  api_encryption_key: !secret wc_encryption_key
+  
+  eth_ip: !secret wc_eth_ip
+  eth_ota_ip: !secret wc_eth_ota_ip
+
+  ds18b20_address_inbox: "0xf6011432d49e8028" #good
+  ds18b20_address_hot_water: "0x5e01143349229d28" #dumb
+  ds18b20_address_cold_water: "0x5e01143349229d28" #dumb
+  ds18b20_address_water_heater: "0x5e01143349229d28" #dumb
+
+  #############################################################
+  # PRESSURE SENSORS
+  #############################################################
+  #
+  # Service pressure fast updater measurements:
+  # ch1 = 0.388V, ch2 = 0.409V, ch3 = 0.608V, ch4 = 0.636V
+  # ch1 = 0.389V, ch2 = 0.410V, ch3 = 0.610V, ch4 = 0.638V
+  # ch1 = 0.389V, ch2 = 0.410V, ch3 = 0.611V, ch4 = 0.638V
+
+  ##### PRESSURE 1 (1.2 MPa) #####
+  # measurements on a desk
+  # input, V:  4,99   4,01   3,01   2      1      0
+  # p-1:       2,49   2      1,5    1      0,5    0
+  # adc-1:     2,617  2,138  1,636  1,129  0,626  0,142
+  p1_0: "0.142"
+  p1_1: "0.626"
+  p1_2: "1.129"
+  p1_3: "1.636"
+  p1_4: "2.138"
+  p1_5: "2.617"
+  p1_zero: "0.452"  # measured: 0.452 V by 'Service: Disable pressure publishing'
+  p1_max: "4.452"   # = 0.452 + 0.333(3) * (12 - 0)
+
+  ##### PRESSURE 2 (1.2 MPa) #####
+  # measurements on a desk
+  # input, V: 4,99   4,01   3,01   2      1      0
+  # p-2:      2,52   2,03   1,52   1,02   0,51   0,01
+  # adc-2:    2,645  2,161  1,654  1,139  0,631  0,142
+  p2_0: "0.142"
+  p2_1: "0.631"
+  p2_2: "1.139"
+  p2_3: "1.654"
+  p2_4: "2.161"
+  p2_5: "2.645"
+  p2_zero: "0.463"  # measured: 0.463 V by 'Service: Disable pressure publishing'
+  p2_max: "4.463"   # = 0.463 + 0.333(3) * (12 - 0)
+
+  ##### PRESSURE 3 (0.5 MPa) #####
+  # measurements on a desk
+  # input, V:  4,99   4,01  3,01   2      1      0
+  # p-3:       2,46   1,98  1,49   0,99   0,49   0
+  # adc-3:     2,806  2,32  1,811  1,305  0,803  0,287
+  p3_0: "0.287"
+  p3_1: "0.803"
+  p3_2: "1.305"
+  p3_3: "1.811"
+  p3_4: "2.320"
+  p3_5: "2.806"
+  p3_zero: "0.495"  # measured: 0.495 V by 'Service: Disable pressure publishing'
+  p3_max: "4.495"   # = 0.495 + 0.8 * (5 - 0)
+
+  ##### PRESSURE 4 (0.5 MPa) #####
+  # measurements on a desk
+  # input, V:  4,99  4,01  3,01  2      1      0
+  # p-4:       2,5   2,02  1,51  1,01   0,51   0,01
+  # adc-4:     2,844 2,357 1,836 1,324  0,815  0,293
+  p4_0: "0.293"
+  p4_1: "0.815"
+  p4_2: "1.324"
+  p4_3: "1.836"
+  p4_4: "2.357"
+  p4_5: "2.844"
+  p4_zero: "0.469"  # measured: 0.469 V by 'Service: Disable pressure publishing'
+  p4_max: "4.469"   # = 0.469 + 0.8 * (5 - 0)
+
+<<: !include water_unit_common.yaml
