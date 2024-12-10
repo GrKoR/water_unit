@@ -265,17 +265,6 @@ switch:
     web_server_sorting_weight: 47
   ###################################################################
 
-  ########## DIAGNOSTIC: PRINT SOME DATA TO THE LOG #############
-    #- platform: template
-    #  id: enable_debug_logging
-    #  name: "Diagnostic: Debug logging"
-    #  optimistic: True
-    #  disabled_by_default: True
-    #  entity_category: diagnostic
-    #  restore_mode: ALWAYS_OFF
-    #  web_server_sorting_weight: 48
-  ###############################################################
-
   ################ DIAGNOSTIC: RESTART ################
   - platform: restart
     id: restart_id
@@ -327,21 +316,6 @@ interval:
                 id(pressure_ch4_zero_point_global) += ch4_v;
                 id(pressure_samples_count_global)++;
   ###################################################################
-
-  ############## DIAGNOSTIC: PRINT SOME DATA TO THE LOG ##################
-    #- interval: 1s
-    #  then:
-    #    - if:
-    #        condition:
-    #          switch.is_on: enable_debug_logging
-    #        then:
-    #          - lambda: |-
-    #              ESP_LOGI("Debug", "Hot GL [global = %s, switch = %s], Cold GL [global = %s, switch = %s]",
-    #                       ONOFF(id(gidrolock_hot_state_global)), ONOFF(id(gidrolock_hot).state),
-    #                       ONOFF(id(gidrolock_cold_state_global)), ONOFF(id(gidrolock_cold).state));
-    #              ESP_LOGI("Debug", "Leakage state: global = %s, sensors = %s",
-    #                       ONOFF(id(leakage_found_global)), ONOFF(id(leakage_sensors).state));
-  ########################################################################
 
   ################ PERIODIC LEAKAGE ACTIONS ################
   ### LEAKAGE MONITORING
