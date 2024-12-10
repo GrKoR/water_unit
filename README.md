@@ -18,6 +18,16 @@
 * Helpers: 1-wire online device searching, average ADC voltage measurement, disable pressure value publishing to the Home Assistant.
 
 
+## ESPHome configuration
+
+Common part of bathroom's and wc's configs: [water_unit_common.yaml](https://github.com/GrKoR/water_unit/blob/master/water_unit_common.yaml).
+
+Bathroom config (substitutions and specific parameters): [wu_bathroom.yaml](https://github.com/GrKoR/water_unit/blob/master/wu_bathroom.yaml)
+WC config file: [wu_wc.yaml](https://github.com/GrKoR/water_unit/blob/master/wu_wc.yaml)
+
+You should compile `wu_bathroom.yaml` or `wu_wc.yaml`.
+
+
 ## Hardware
 
 CPU board of this project is [WT32-ETH01](https://files.seeedstudio.com/products/102991455/WT32-ETH01_datasheet_V1.1-%20en.pdf) with the following pin usage:  
