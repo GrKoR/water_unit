@@ -21,11 +21,11 @@
 ## Hardware
 
 CPU board of this project is [WT32-ETH01](https://files.seeedstudio.com/products/102991455/WT32-ETH01_datasheet_V1.1-%20en.pdf) with the following pin usage:  
-![esp-pinout](https://github.com/GrKoR/)
+![esp-pinout](https://github.com/GrKoR/water_unit/blob/master/docs/water-unit-esp-pin-usage.png)
 
 
 Schematic diagram of the board:  
-![board-schematic](https://github.com/GrKoR/)
+![board-schematic](https://github.com/GrKoR/water_unit/blob/master/docs/water-unit-schematic.png)
 
 PCB of the water unit (made only as a test of trace routing for handmade prototyping):  
-![pcb-prototype](https://github.com/GrKoR/)
+![pcb-prototype](https://github.com/GrKoR/water_unit/blob/master/docs/water-unit-pcb.png)
