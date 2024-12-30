@@ -18,6 +18,10 @@
 * Helpers: 1-wire online device searching, average ADC voltage measurement, disable pressure value publishing to the Home Assistant.
 
 
+## Not a bug!
+Because the strapping pins are actively used in the device, Gidrolocks close and open during the device reboot. This happens only if Gidrolocks was open. In case Gidrolocks are closed they will not be opened by reboot process.
+
+
 ## ESPHome configuration
 
 Common part of bathroom's and wc's configs: [water_unit_common.yaml](https://github.com/GrKoR/water_unit/blob/master/water_unit_common.yaml).
