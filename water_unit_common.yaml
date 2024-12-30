@@ -125,16 +125,7 @@ esphome:
 
       ############ GIDROLOCKS: INITIAL STATE ############
       - lambda: |-
-          if (id(leakage_found_global))
-          {
-            if (id(gidrolock_hot_state_global)) id(gidrolock_hot_state_global) = false;
-            if (id(gidrolock_cold_state_global)) id(gidrolock_cold_state_global) = false;
-            id(gidrolocks_close_script).execute();
-          }
-          else
-          {
-            id(gidrolocks_open_script)->execute(false);
-          }
+          id(leakage_found_global) ? id(gidrolocks_close_script).execute() : id(gidrolocks_open_script).execute();
       ###################################################
 
 text_sensor:
@@ -327,18 +318,22 @@ interval:
   ###################################################################
 
   ################ PERIODIC LEAKAGE ACTIONS ################
-  ### LEAKAGE MONITORING
-  - interval: 3s
+  ### LEAKAGE STATE SYNC: leakage global to leakage state sensor
+  - interval: 300ms
     then:
       - lambda: |-
-          if (!id(leakage_ignore_flag_global) && id(leakage_sensors).state)
+          id(id_leakage_found_state).publish_state(id(leakage_found_global));
+
+  ### LEAKAGE MONITORING
+  - interval: 1s
+    # We use an interval instead of the binary_sensor.on_press action to handle situations
+    # where the ignore period has passed, but the leakage is still present.
+    then:
+      - lambda: |-
+          if (!id(leakage_ignore_flag_global) && id(leakage_sensors).state && !id(leakage_found_global))
           {
             id(leakage_found_global) = true;
-            id(id_leakage_found_state).publish_state(true);
-            if (id(gidrolock_hot).state || id(gidrolock_cold).state)
-            {
-              id(gidrolocks_close_script).execute();
-            }
+            id(gidrolocks_close_script).execute();
           }
 
   ### LEAKAGE IGNORE STATE MONITOR
@@ -754,9 +749,6 @@ button:
       - globals.set:
           id: leakage_found_global
           value: 'false'
-      - binary_sensor.template.publish:
-          id: id_leakage_found_state
-          state: OFF
     web_server_sorting_weight: 6
   #####################################################
 
@@ -784,9 +776,7 @@ button:
   - platform: template
     name: "Gidrolocks: Open"
     on_press:
-      - script.execute:
-          id: gidrolocks_open_script
-          called_by_user: true
+      - script.execute: gidrolocks_open_script
     web_server_sorting_weight: 8
   #####################################################
 
@@ -794,12 +784,6 @@ button:
   - platform: template
     name: "Gidrolocks: Close"
     on_press:
-      - globals.set:
-          id: gidrolock_hot_state_global
-          value: 'false'
-      - globals.set:
-          id: gidrolock_cold_state_global
-          value: 'false'
       - script.execute: gidrolocks_close_script
     web_server_sorting_weight: 9
   #####################################################
@@ -960,9 +944,7 @@ script:
                 id(gidrolock_cold_tmp_state) = id(gidrolock_cold).state;
             - script.execute: gidrolocks_close_script
             - delay: 30s
-            - script.execute:
-                id: gidrolocks_open_script
-                called_by_user: false
+            - script.execute: gidrolocks_open_script
             - lambda: |-
                 // restore initial states of gidrolocks
                 id(gidrolock_hot).publish_state(id(gidrolock_hot_tmp_state));
@@ -982,36 +964,29 @@ script:
     mode: single
     then:
       - switch.turn_off: gidrolock_hot
+      - globals.set:
+          id: gidrolock_hot_state_global
+          value: 'false'
       - switch.turn_off: gidrolock_cold
+      - globals.set:
+          id: gidrolock_cold_state_global
+          value: 'false'
   ##################################################
 
   ############# GIDROLOCK OPEN SCRIPT #############
   - id: gidrolocks_open_script
     mode: single
-    parameters:
-      called_by_user: bool
     then:
-      - if:
-          condition:
-            lambda: 'return called_by_user;'
-          then:
-            - globals.set:
-                id: leakage_found_global
-                value: 'false'
-            - binary_sensor.template.publish:
-                id: id_leakage_found_state
-                state: OFF
-            - globals.set:
-                id: gidrolock_hot_state_global
-                value: 'true'
-            - globals.set:
-                id: gidrolock_cold_state_global
-                value: 'true'
       - if: 
           condition:
             lambda: 'return !id(leakage_found_global);'
           then:
-            - lambda: |-
-                id(gidrolock_hot_state_global) ? id(gidrolock_hot).turn_on() : id(gidrolock_hot).turn_off();
-                id(gidrolock_cold_state_global) ? id(gidrolock_cold).turn_on() : id(gidrolock_cold).turn_off();
+            - switch.turn_on: gidrolock_hot
+            - globals.set:
+                id: gidrolock_hot_state_global
+                value: 'true'
+            - switch.turn_on: gidrolock_cold
+            - globals.set:
+                id: gidrolock_cold_state_global
+                value: 'true'
   #################################################
