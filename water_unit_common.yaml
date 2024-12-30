@@ -168,6 +168,7 @@ switch:
         output: True
       ignore_strapping_warning: True
     inverted: true
+    entity_category: diagnostic
     icon: mdi:led-outline
     web_server_sorting_weight: 42
 
@@ -176,6 +177,7 @@ switch:
     id: id_test_led2
     pin: GPIO17
     inverted: true
+    entity_category: diagnostic
     icon: mdi:led-outline
     web_server_sorting_weight: 43
   ##################################################
