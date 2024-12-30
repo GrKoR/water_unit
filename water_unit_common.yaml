@@ -64,11 +64,11 @@ api:
     ###############################################
 
 
+############# GIDROLOCK SERVICE CALL #############
 time:
   - platform: homeassistant  
     id: id_time
     timezone: "MSK-3"
-    ############# GIDROLOCK SERVICE CALL #############
     ### Call it every first monday of a month
     on_time: 
       - seconds: 0
@@ -79,7 +79,7 @@ time:
         months: '*'
         then:
           - script.execute: gidrolock_service_operation_script
-    ##################################################
+##################################################
 
 
 one_wire:
@@ -116,6 +116,11 @@ esphome:
       ############ GIDROLOCKS: LAST SERVICE INIT ############
       - lambda: |-
           id(id_last_gidrolocks_service_call).publish_state(id(gidrolock_last_service_call_global));
+      #######################################################
+
+      ############ LEAKAGE: LAST STATE ############
+      - lambda: |-
+          id(id_leakage_found_state).publish_state(id(leakage_found_global));
       #######################################################
 
       ############ GIDROLOCKS: INITIAL STATE ############
