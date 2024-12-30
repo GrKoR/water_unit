@@ -193,6 +193,7 @@ switch:
         output: True
       ignore_strapping_warning: True
     inverted: false
+    entity_category: diagnostic
     icon: mdi:lock-open
     restore_mode: DISABLED
     web_server_sorting_weight: 40
@@ -207,6 +208,7 @@ switch:
         output: True
       ignore_strapping_warning: True
     inverted: false
+    entity_category: diagnostic
     icon: mdi:lock-open
     restore_mode: DISABLED
     web_server_sorting_weight: 41
