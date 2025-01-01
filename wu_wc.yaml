@@ -14,10 +14,10 @@ substitutions:
   eth_ip: !secret wc_eth_ip
   eth_ota_ip: !secret wc_eth_ota_ip
 
-  ds18b20_address_inbox: "0xf6011432d49e8028" #good
-  ds18b20_address_hot_water: "0x5e01143349229d28" #dumb
-  ds18b20_address_cold_water: "0x5e01143349229d28" #dumb
-  ds18b20_address_water_heater: "0x5e01143349229d28" #dumb
+  ds18b20_address_inbox: "0xf6011432d49e8028"
+  ds18b20_address_hot_water: "0xc7011433492aa028"
+  ds18b20_address_cold_water: "0x7602131d85deaa28"
+  ds18b20_address_water_heater: "0x2a02131d8743aa28"
 
   #############################################################
   # PRESSURE SENSORS

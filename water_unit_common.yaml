@@ -408,39 +408,43 @@ sensor:
     name: Inbox Temperature
     device_class: temperature
     unit_of_measurement: "°C"
+    accuracy_decimals: 2
     web_server_sorting_weight: 10
 
   # HOT WATER TEMPERATURE
   - platform: dallas_temp
     one_wire_id: id_1wire
     address: ${ds18b20_address_hot_water}
-    update_interval: 1h #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    update_interval: 1min
     id: hot_water_temperature
     name: Hot Water Temperature
     device_class: temperature
     unit_of_measurement: "°C"
+    accuracy_decimals: 2
     web_server_sorting_weight: 11
 
   # COLD WATER TEMPERATURE
   - platform: dallas_temp
     one_wire_id: id_1wire
     address: ${ds18b20_address_cold_water}
-    update_interval: 1h #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    update_interval: 1min
     id: cold_water_temperature
     name: Cold Water Temperature
     device_class: temperature
     unit_of_measurement: "°C"
+    accuracy_decimals: 2
     web_server_sorting_weight: 12
 
   # WATER HEATER TEMPERATURE
   - platform: dallas_temp
     one_wire_id: id_1wire
     address: ${ds18b20_address_water_heater}
-    update_interval: 1h #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    update_interval: 1min
     id: water_heater_temperature
     name: Water Heater Temperature
     device_class: temperature
     unit_of_measurement: "°C"
+    accuracy_decimals: 2
     web_server_sorting_weight: 13
   ##################################################
 
