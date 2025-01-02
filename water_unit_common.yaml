@@ -739,7 +739,7 @@ binary_sensor:
 
   ########## LEAKAGE STATE ##########
   - platform: template
-    name: "Leakage: found"
+    name: "Leakage: Alarm"
     id: id_leakage_found_state
     web_server_sorting_weight: 3
   ##############################################################
